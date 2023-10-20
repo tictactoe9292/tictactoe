@@ -1,2 +1,7 @@
 
 .idea/workspace.xml
+backend/.idea/vcs.xml
+backend/go.sum
+.idea/misc.xml
+*.iml
+*.xml

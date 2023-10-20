@@ -2,23 +2,23 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/labstack/echo"
 	"github.com/tictactoefan/tictactoe/backend/game_manager"
 	"github.com/tictactoefan/tictactoe/backend/tictactoe"
-	"log"
 	"net/http"
 	"strconv"
 )
 
 func main() {
-	http.HandleFunc("/game", getGameHandler)
-	http.HandleFunc("/games", getAllGamesHandler)
-	http.HandleFunc("/game/create", createGameHandler)
-	http.HandleFunc("/game/move", makeMoveHandler)
 
-	address := "localhost:9876"
-	log.Printf("Listening on %s", address)
-	log.Fatal(http.ListenAndServe(address, nil))
+	e := echo.New()
+
+	e.GET("/games", GetGames)
+	e.GET("/games/:id", GetGame)
+	e.POST("/games", CreateGames)
+	e.POST("/games/move", MoveGame)
+
+	e.Logger.Fatal(e.Start(":8080"))
 }
 
 // TODO: Update model to use different data types to avoid so many type conversions.
@@ -34,48 +34,37 @@ type IdJSON struct {
 	ID string `json:"id"`
 }
 
+type ErrorJSON struct {
+	Error string `json:"error"`
+}
+
 var gm = game_manager.NewGameManager()
 
-func getGameHandler(w http.ResponseWriter, r *http.Request) { // TODO: GET body should not be used; get ID from somewhere else (e.g. URL, header, other).
-	if !verifyRequest("GET", w, r) {
-		return
-	}
+func GetGame(c echo.Context) error {
+	id := c.Param("id")
 
-	var gameIdJSON IdJSON
-	err := json.NewDecoder(r.Body).Decode(&gameIdJSON)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
-	}
-
-	gameId, convErr := strconv.ParseInt(gameIdJSON.ID, 10, 32)
+	gameId, convErr := strconv.ParseInt(id, 10, 32)
 	if convErr != nil {
-		http.Error(w, `{"error":"bad id provided"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"bad id provided"})
 	}
 
 	game, findGameErr := gm.GetGameById(int(gameId))
 	if findGameErr != nil {
-		http.Error(w, `{"error":"game does not exist"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"game does not exist"})
 	}
 
 	var result = GameJSON{
-		ID:       gameIdJSON.ID,
+		ID:       id,
 		Board:    game.GetBoard(),
 		NextTurn: string(game.GetNextTurn()),
 		GameOver: strconv.FormatBool(game.IsGameOver()),
 		Winner:   string(game.GetWinner()),
 	}
 
-	json.NewEncoder(w).Encode(result)
+	return c.JSON(http.StatusOK, result)
 }
 
-func getAllGamesHandler(w http.ResponseWriter, r *http.Request) {
-	if !verifyRequest("GET", w, r) {
-		return
-	}
-
+func GetGames(c echo.Context) error {
 	games := gm.GetAllGames()
 	gamesJSON := make([]GameJSON, 0, len(games))
 	for _, game := range games {
@@ -88,19 +77,14 @@ func getAllGamesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	json.NewEncoder(w).Encode(gamesJSON)
+	return c.JSON(http.StatusOK, gamesJSON)
 }
 
-func createGameHandler(w http.ResponseWriter, r *http.Request) {
-	if !verifyRequest("POST", w, r) {
-		return
-	}
-
+func CreateGames(c echo.Context) error {
 	gameId := gm.CreateNewGame()
 
 	var result = IdJSON{ID: strconv.FormatInt(int64(gameId), 10)}
-
-	json.NewEncoder(w).Encode(result)
+	return c.JSON(http.StatusCreated, result)
 }
 
 type MakeMoveJSON struct {
@@ -109,54 +93,32 @@ type MakeMoveJSON struct {
 	Player   string `json:"player"`
 }
 
-func makeMoveHandler(w http.ResponseWriter, r *http.Request) {
-	if !verifyRequest("POST", w, r) {
-		return
-	}
-
+func MoveGame(c echo.Context) error {
 	var makeMoveJSON MakeMoveJSON
-	err := json.NewDecoder(r.Body).Decode(&makeMoveJSON)
+	defer c.Request().Body.Close()
+	err := json.NewDecoder(c.Request().Body).Decode(&makeMoveJSON)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{err.Error()})
 	} else if makeMoveJSON.GameID == "" || makeMoveJSON.Location == "" || makeMoveJSON.Player == "" { // TODO: refactor into own function to use on all API calls
-		http.Error(w, `{"error":"'gameId', 'location' and 'player' fields required"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"'gameId', 'location' and 'player' fields required"})
 	}
 
 	gameId, convErr := strconv.ParseInt(makeMoveJSON.GameID, 10, 32) // TODO: refactor into own function.
 	if convErr != nil {
-		http.Error(w, `{"error":"bad gameId provided"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"bad gameId provided"})
 	}
 	game, findGameErr := gm.GetGameById(int(gameId)) // TODO: refactor into own function.
 	if findGameErr != nil {
-		http.Error(w, `{"error":"game does not exist"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"game does not exist"})
 	}
 	location, convErr := strconv.ParseInt(makeMoveJSON.Location, 10, 32)
 	if convErr != nil {
-		http.Error(w, `{"error":"bad location provided"}`, http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{"bad location provided"})
 	}
 
 	err = gm.MakeMove(game.GetId(), tictactoe.Cell(makeMoveJSON.Player), tictactoe.Location(location))
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
-		return
+		return c.JSON(http.StatusBadRequest, ErrorJSON{err.Error()})
 	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func verifyRequest(supportedMethod string, w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != supportedMethod {
-		http.Error(w, fmt.Sprintf(`{"error":"Invalid request method: %s"}`, r.Method), http.StatusMethodNotAllowed)
-		return false
-	} else if r.Body == nil {
-		http.Error(w, `{"error":"Please send a request body"}`, http.StatusBadRequest)
-		return false
-	}
-
-	return true
+	return c.NoContent(200)
 }

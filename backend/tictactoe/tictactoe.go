@@ -2,6 +2,7 @@ package tictactoe
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Location int
@@ -75,7 +76,7 @@ func (g *Game) MakeMove(cell Cell, loc Location) error {
 	}
 
 	g.updateOutcome(cell)
-
+	g.PrintBoard()
 	return nil
 }
 
@@ -111,4 +112,13 @@ func (g *Game) updateOutcome(candidate Cell) {
 	if g.turnsTaken == 9 || g.winner != None {
 		g.gameOver = true
 	}
+}
+
+func (g Game) PrintBoard() {
+	fmt.Printf("Turn %d\n", g.turnsTaken)
+	fmt.Printf("%c | %c | %c\n", g.board[0], g.board[1], g.board[2])
+	fmt.Println("----------")
+	fmt.Printf("%c | %c | %c\n", g.board[3], g.board[4], g.board[5])
+	fmt.Println("----------")
+	fmt.Printf("%c | %c | %c\n", g.board[6], g.board[7], g.board[8])
 }
