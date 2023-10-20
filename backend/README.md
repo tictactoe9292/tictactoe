@@ -40,7 +40,7 @@ All endpoints, upon some failure, return an error response:
 }
 ```
 
-### POST /game/create
+### POST /games/create
 
 Creates a new game instance.
 
@@ -54,7 +54,7 @@ Response:
 
 - `id` - Uniquely identifies the new game instance.
 
-### GET /game/{id}
+### GET /games/{id}
 
 Gets the state of an existing game, given a game `id`.
 
@@ -111,9 +111,7 @@ Response is an array of zero or more games:
 ]
 ```
 
-See [GET /game](#GET-/games) for the meaning of each game's attributes shown above.
-
-### POST /game/move
+### POST /games/move
 
 Play a move on an existing game.
 
