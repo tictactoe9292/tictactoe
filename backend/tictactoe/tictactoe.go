@@ -115,7 +115,7 @@ func (g *Game) updateOutcome(candidate Cell) {
 }
 
 func (g Game) PrintBoard() {
-	fmt.Printf("Turn %d\n", g.turnsTaken)
+	fmt.Printf("\n\nTurn %d\n", g.turnsTaken)
 	fmt.Printf("%c | %c | %c\n", g.board[0], g.board[1], g.board[2])
 	fmt.Println("----------")
 	fmt.Printf("%c | %c | %c\n", g.board[3], g.board[4], g.board[5])
